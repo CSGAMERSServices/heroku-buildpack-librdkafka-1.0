@@ -9,7 +9,6 @@ set -eo pipefail
 LIBRDKAFKA_VERSION=1.0.0
 LIBRDKAFKA_DIST=librdkafka-${LIBRDKAFKA_VERSION}
 LIBRDKAFKA_DIST_GZ=${LIBRDKAFKA_DIST}.tar.gz
-LIBRDKAFKA_SHASUM256=9d8f1eb7b0e29e9ab1168347c939cb7ae5dff00a39cef99e7ef033fd8f92737c
 
 BUILD_DIR=$1
 CACHE_DIR=$2
@@ -38,8 +37,6 @@ fi
 # download
 curl -Lo ${LIBRDKAFKA_DIST_GZ} https://github.com/edenhill/librdkafka/archive/v${LIBRDKAFKA_VERSION}.tar.gz
 
-# verify
-echo "${LIBRDKAFKA_SHASUM256}  ${LIBRDKAFKA_DIST_GZ}" | shasum -c -
 
 # extract
 tar zxf $LIBRDKAFKA_DIST_GZ
