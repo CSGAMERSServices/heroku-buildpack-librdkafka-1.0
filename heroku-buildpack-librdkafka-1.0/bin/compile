@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+
+# ## Usage
+#
+#     $ bin/compile <build-dir> <cache-dir> <env-dir>
+
+set -eo pipefail
+
+LIBRDKAFKA_VERSION=1.0.0
+LIBRDKAFKA_DIST=librdkafka-${LIBRDKAFKA_VERSION}
+LIBRDKAFKA_DIST_GZ=${LIBRDKAFKA_DIST}.tar.gz
+LIBRDKAFKA_SHASUM256=9d8f1eb7b0e29e9ab1168347c939cb7ae5dff00a39cef99e7ef033fd8f92737c
+
+BUILD_DIR=$1
+CACHE_DIR=$2
+
+# rely on heroku-buildpack-python to find our libs
+# # https://github.com/heroku/heroku-buildpack-python/blob/0b8741916676f70eb6537aa8da402fbdbe5292c7/bin/compile#L117
+VENDOR_DIR=${BUILD_DIR}/.heroku/vendor
+VENDOR_RUN_DIR=${VENDOR_DIR/$BUILD_DIR//app}
+PROFILE_PATH=${BUILD_DIR}/.profile.d/librdkafka.sh
+
+if [ -z "${CACHE_DIR}" ]; then
+    echo invalid usage - missing cache dir
+    exit 1
+fi
+
+mkdir -p $CACHE_DIR
+cd $CACHE_DIR
+
+# remove old, pre-installed librdkafka during this build, it'll be there again once slug is deployed
+if [ -z "${KEEP_LIBRDKAFKA_DPKG}" ]; then
+   set +e
+   apt-get remove -y librdkafka-dev librdkafka1
+   set -e
+fi
+
+# download
+curl -Lo ${LIBRDKAFKA_DIST_GZ} https://github.com/edenhill/librdkafka/archive/v${LIBRDKAFKA_VERSION}.tar.gz
+
+# verify
+echo "${LIBRDKAFKA_SHASUM256}  ${LIBRDKAFKA_DIST_GZ}" | shasum -c -
+
+# extract
+tar zxf $LIBRDKAFKA_DIST_GZ
+
+# clean up
+rm $LIBRDKAFKA_DIST_GZ
+
+cd $LIBRDKAFKA_DIST
+
+if [ ! -e Makefile.config ]; then
+   ./configure --prefix=${VENDOR_DIR}
+fi
+make
+make install
+
+mkdir -p $(dirname $PROFILE_PATH)
+cat > $PROFILE_PATH <<EOF
+export C_INCLUDE_PATH=$VENDOR_RUN_DIR/include:\$C_INCLUDE_PATH
+export LIBRARY_PATH=$VENDOR_RUN_DIR/lib:\$LIBRARY_PATH
+export LD_LIBRARY_PATH=$VENDOR_RUN_DIR/lib:\$LD_LIBRARY_PATH
+EOF
+chmod 755 $PROFILE_PATH
+
+rm -rf $CACHE_DIR
